@@ -17,8 +17,16 @@ type track struct {
 	last     time.Time
 }
 
+// Summary contains the current tally results
+type Summary struct {
+	Total    int64
+	Duration time.Duration
+	Spans    []Span
+}
+
 // Tally holds the counts for the specific durations
 type Tally struct {
+	total int64
 	sync.RWMutex
 	start time.Time
 	spans []track
@@ -47,6 +55,7 @@ func (t *Tally) Reset(amt int64) {
 		t.spans[i].last = now
 	}
 	t.start = now
+	t.total = 0
 	t.Unlock()
 }
 
@@ -64,12 +73,17 @@ func (t *Tally) Increment(amt int64) {
 	t.Unlock()
 }
 
-func (t *Tally) Tallies() []Span {
-	spans := make([]Span, len(t.spans))
+// Status returns data accumulated thus far
+func (t *Tally) Status() Summary {
+	sum := Summary{
+		Total:    t.total,
+		Duration: time.Now().Sub(t.start),
+		Spans:    make([]Span, 0, len(t.spans)),
+	}
 	t.RLock()
-	for i, s := range t.spans {
-		spans[i] = Span{Duration: s.duration, Count: s.count}
+	for _, s := range t.spans {
+		sum.Spans = append(sum.Spans, Span{Duration: s.duration, Count: s.count})
 	}
 	t.RUnlock()
-	return spans
+	return sum
 }
